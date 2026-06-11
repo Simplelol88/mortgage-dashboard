@@ -2,6 +2,7 @@ export const DEFAULT_INTEREST_RATE = 4.89;
 export const DEFAULT_SIFO_EXPENSES = 22_000;
 
 const MAX_INPUT_VALUE = 999_999_999;
+const EXTRA_INCOME_MONTHS_FOR_MACRO = 10;
 
 export function parseNokInput(value) {
   const digits = String(value ?? "")
@@ -21,6 +22,17 @@ export function calculateMortgageLimits(inputs) {
   const netIncome = nonNegative(inputs.netIncome);
   const existingDebt = nonNegative(inputs.existingDebt);
   const monthlyDebtPayment = nonNegative(inputs.monthlyDebtPayment);
+  const rentalHouseIncome = nonNegative(inputs.rentalHouseIncome);
+  const house2Income = nonNegative(inputs.house2Income);
+  const rentalHouseIncomeAfterTax = currency(rentalHouseIncome * 0.78);
+  const extraMonthlyIncome = currency(rentalHouseIncomeAfterTax + house2Income);
+  const extraAnnualIncomeForMacro = currency(
+    extraMonthlyIncome * EXTRA_INCOME_MONTHS_FOR_MACRO,
+  );
+  const effectiveAnnualIncome = currency(
+    grossIncome + extraAnnualIncomeForMacro,
+  );
+  const effectiveNetMonthlyIncome = currency(netIncome + extraMonthlyIncome);
   const propertyValue = nonNegative(inputs.propertyValue);
   const bankDeposits = nonNegative(inputs.bankDeposits);
   const homeEquity = currency(propertyValue - existingDebt);
@@ -30,8 +42,10 @@ export function calculateMortgageLimits(inputs) {
   const stressAddon = Math.max(0, Number(inputs.stressAddon) || 0);
   const sifoExpenses = nonNegative(inputs.sifoExpenses);
 
-  const macroLimit = currency(grossIncome * 5 - existingDebt);
-  const freeCash = currency(netIncome - sifoExpenses - monthlyDebtPayment);
+  const macroLimit = currency(effectiveAnnualIncome * 5 - existingDebt);
+  const freeCash = currency(
+    effectiveNetMonthlyIncome - sifoExpenses - monthlyDebtPayment,
+  );
   const months = termYears * 12;
   const monthlyStressRate = (interestRate + stressAddon) / 100 / 12;
   const liquidityLimit =
@@ -50,6 +64,11 @@ export function calculateMortgageLimits(inputs) {
     freeCash,
     homeEquity,
     totalEquity,
+    rentalHouseIncomeAfterTax,
+    extraMonthlyIncome,
+    extraAnnualIncomeForMacro,
+    effectiveAnnualIncome,
+    effectiveNetMonthlyIncome,
     monthlyStressRate,
     stressRateAnnual: interestRate + stressAddon,
     bottleneckKey: findBottleneck({

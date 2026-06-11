@@ -14,6 +14,8 @@ const defaultInputs = {
   monthlyDebtPayment: 10_889,
   propertyValue: 2_950_000,
   bankDeposits: 600_000,
+  rentalHouseIncome: 0,
+  house2Income: 0,
   termYears: 30,
   interestRate: 4.89,
   stressAddon: 3,
@@ -44,6 +46,22 @@ test("home equity never goes below zero when debt exceeds property value", () =>
   assert.equal(result.homeEquity, 0);
   assert.equal(result.totalEquity, 200_000);
   assert.equal(result.ltvLimit, 1_133_333);
+});
+
+test("adds taxed rental income and counts ten months for the macro rule", () => {
+  const result = calculateMortgageLimits({
+    ...defaultInputs,
+    rentalHouseIncome: 10_000,
+    house2Income: 5_000,
+  });
+
+  assert.equal(result.rentalHouseIncomeAfterTax, 7_800);
+  assert.equal(result.extraMonthlyIncome, 12_800);
+  assert.equal(result.extraAnnualIncomeForMacro, 128_000);
+  assert.equal(result.effectiveAnnualIncome, 1_228_000);
+  assert.equal(result.effectiveNetMonthlyIncome, 77_800);
+  assert.equal(result.macroLimit, 4_578_760);
+  assert.equal(result.freeCash, 44_911);
 });
 
 test("liquidity stress test returns zero when free monthly cash is unavailable", () => {

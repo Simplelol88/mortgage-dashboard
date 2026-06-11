@@ -17,6 +17,8 @@ const DEFAULT_FORM = {
   monthlyDebtPayment: 10_889,
   propertyValue: 2_950_000,
   bankDeposits: 600_000,
+  rentalHouseIncome: 0,
+  house2Income: 0,
   termYears: 30,
   interestRate: DEFAULT_INTEREST_RATE,
   stressAddon: 3,
@@ -50,6 +52,8 @@ type MoneyField = keyof Pick<
   | "monthlyDebtPayment"
   | "propertyValue"
   | "bankDeposits"
+  | "rentalHouseIncome"
+  | "house2Income"
   | "sifoExpenses"
 >;
 type DecimalField = keyof Pick<FormState, "interestRate" | "stressAddon">;
@@ -156,6 +160,32 @@ export default function Home() {
                 onChange={(value) => setMoneyField("monthlyDebtPayment", value)}
                 value={form.monthlyDebtPayment}
               />
+              <MoneyInput
+                label="Доход от аренды дома в месяц"
+                onChange={(value) => setMoneyField("rentalHouseIncome", value)}
+                value={form.rentalHouseIncome}
+              />
+              <MoneyInput
+                label="Доход от дома 2 в месяц без налога"
+                onChange={(value) => setMoneyField("house2Income", value)}
+                value={form.house2Income}
+              />
+              <div className="rounded-lg border border-[#e5d9c7] bg-[#fffaf1] p-4">
+                <p className="text-sm font-semibold text-[#6f624e]">
+                  Доп. доход в расчет
+                </p>
+                <p className="mt-2 text-2xl font-semibold tabular-nums">
+                  {formatNok(limits.extraMonthlyIncome)}
+                </p>
+                <p className="mt-1 text-sm text-[#6f624e]">
+                  Аренда после 22% налога:{" "}
+                  {formatNok(limits.rentalHouseIncomeAfterTax)}
+                </p>
+                <p className="mt-1 text-sm text-[#6f624e]">
+                  В 5x учтено за 10 месяцев:{" "}
+                  {formatNok(limits.extraAnnualIncomeForMacro)}
+                </p>
+              </div>
               <MoneyInput
                 label="Стоимость текущего объекта"
                 onChange={(value) => setMoneyField("propertyValue", value)}
