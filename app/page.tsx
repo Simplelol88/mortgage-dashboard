@@ -6,8 +6,6 @@ import {
   DEFAULT_INTEREST_RATE,
   DEFAULT_SIFO_EXPENSES,
   calculateMortgageLimits,
-  fetchSifoExpenses,
-  fetchSpareBankRate,
   formatNokInput,
   parseNokInput,
 } from "./lib/mortgage.js";
@@ -17,7 +15,8 @@ const DEFAULT_FORM = {
   netIncome: 65_000,
   existingDebt: 1_561_240,
   monthlyDebtPayment: 10_889,
-  equity: 600_000,
+  propertyValue: 2_950_000,
+  bankDeposits: 600_000,
   termYears: 30,
   interestRate: DEFAULT_INTEREST_RATE,
   stressAddon: 3,
@@ -49,24 +48,14 @@ type MoneyField = keyof Pick<
   | "netIncome"
   | "existingDebt"
   | "monthlyDebtPayment"
-  | "equity"
+  | "propertyValue"
+  | "bankDeposits"
   | "sifoExpenses"
 >;
 type DecimalField = keyof Pick<FormState, "interestRate" | "stressAddon">;
-type DataStatus = {
-  rate: string;
-  sifo: string;
-  detail: string;
-};
 
 export default function Home() {
   const [form, setForm] = useState(DEFAULT_FORM);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [dataStatus, setDataStatus] = useState<DataStatus>({
-    rate: "Ставка: fallback 4,89%",
-    sifo: "SIFO: fallback 22 000 NOK",
-    detail: "Нажмите обновление, чтобы попробовать получить данные с серверов.",
-  });
 
   const limits = useMemo(() => calculateMortgageLimits(form), [form]);
   const chartData = useMemo(
@@ -105,39 +94,6 @@ export default function Home() {
     }));
   }
 
-  async function refreshExternalData() {
-    setIsRefreshing(true);
-    setDataStatus((current) => ({
-      ...current,
-      detail: "Загрузка данных SpareBank и SIFO...",
-    }));
-
-    const [rateResult, sifoResult] = await Promise.all([
-      fetchSpareBankRate(),
-      fetchSifoExpenses({ adults: 2, includeCar: true }),
-    ]);
-
-    setForm((current) => ({
-      ...current,
-      interestRate: rateResult.value,
-      sifoExpenses: sifoResult.value,
-    }));
-
-    setDataStatus({
-      rate: rateResult.fallback
-        ? `Ставка: fallback ${formatPercent(rateResult.value)}`
-        : `Ставка: сервер ${formatPercent(rateResult.value)}`,
-      sifo: sifoResult.fallback
-        ? `SIFO: fallback ${formatNok(sifoResult.value)}`
-        : `SIFO: сервер ${formatNok(sifoResult.value)}`,
-      detail:
-        rateResult.fallback || sifoResult.fallback
-          ? "Часть серверных запросов не прошла; применены резервные значения."
-          : "Данные обновлены с серверов.",
-    });
-    setIsRefreshing(false);
-  }
-
   return (
     <main className="min-h-screen bg-[#f7f5ef] text-[#191715]">
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-5 sm:px-6 lg:px-8">
@@ -170,24 +126,13 @@ export default function Home() {
 
         <section className="grid min-w-0 gap-6 lg:grid-cols-[420px_1fr]">
           <div className="min-w-0 rounded-lg border border-[#ddd6c8] bg-white p-5 shadow-sm">
-            <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="mb-5">
               <div>
                 <h2 className="text-xl font-semibold">Входные данные</h2>
                 <p className="mt-1 text-sm text-[#6f624e]">
                   Значения в NOK, ставка в процентах годовых.
                 </p>
               </div>
-              <button
-                className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-[#8f2f2f] bg-[#8f2f2f] px-4 text-sm font-semibold text-white transition hover:bg-[#742727] disabled:cursor-wait disabled:opacity-70 sm:w-auto"
-                disabled={isRefreshing}
-                onClick={refreshExternalData}
-                type="button"
-              >
-                {isRefreshing ? <span className="spinner" /> : null}
-                {isRefreshing
-                  ? "Обновление..."
-                  : "Обновить данные с серверов"}
-              </button>
             </div>
 
             <div className="grid gap-4">
@@ -212,10 +157,26 @@ export default function Home() {
                 value={form.monthlyDebtPayment}
               />
               <MoneyInput
-                label="Собственный капитал"
-                onChange={(value) => setMoneyField("equity", value)}
-                value={form.equity}
+                label="Стоимость текущего объекта"
+                onChange={(value) => setMoneyField("propertyValue", value)}
+                value={form.propertyValue}
               />
+              <MoneyInput
+                label="Банковские вклады"
+                onChange={(value) => setMoneyField("bankDeposits", value)}
+                value={form.bankDeposits}
+              />
+              <div className="rounded-lg border border-[#e5d9c7] bg-[#fffaf1] p-4">
+                <p className="text-sm font-semibold text-[#6f624e]">
+                  Капитал в текущей ипотеке
+                </p>
+                <p className="mt-2 text-2xl font-semibold tabular-nums">
+                  {formatNok(limits.homeEquity)}
+                </p>
+                <p className="mt-1 text-sm text-[#6f624e]">
+                  Общий капитал: {formatNok(limits.totalEquity)}
+                </p>
+              </div>
               <MoneyInput
                 label="Расходы SIFO"
                 onChange={(value) => setMoneyField("sifoExpenses", value)}
@@ -292,14 +253,6 @@ export default function Home() {
               />
             </section>
 
-            <section className="rounded-lg border border-[#ddd6c8] bg-[#fffaf1] p-5">
-              <h2 className="text-lg font-semibold">Данные</h2>
-              <div className="mt-3 grid gap-3 text-sm sm:grid-cols-2">
-                <StatusLine text={dataStatus.rate} />
-                <StatusLine text={dataStatus.sifo} />
-              </div>
-              <p className="mt-3 text-sm text-[#6f624e]">{dataStatus.detail}</p>
-            </section>
           </div>
         </section>
       </div>
@@ -420,14 +373,6 @@ function RuleCard({
       <h3 className="mt-1 text-base font-semibold">{title}</h3>
       <p className="mt-3 text-2xl font-semibold tabular-nums">{value}</p>
     </article>
-  );
-}
-
-function StatusLine({ text }: { text: string }) {
-  return (
-    <div className="rounded-lg border border-[#e5d9c7] bg-white px-3 py-2 font-medium text-[#413a32]">
-      {text}
-    </div>
   );
 }
 
